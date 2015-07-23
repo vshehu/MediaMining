@@ -1,0 +1,65 @@
+﻿@{
+    ViewBag.Title = "TrendVisualization";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<script src="/Scripts/d3.min.js"></script>
+<script src="/Scripts/d3.layout.cloud.js"></script>
+<script src="/Scripts/jquery-1.8.2.js"></script>
+
+<script type="text/javascript"
+        src="https://www.google.com/jsapi?autoload={
+            'modules':[{
+              'name':'visualization',
+              'version':'1',
+              'packages':['corechart']
+            }]
+          }"></script>
+
+
+<h2>TrendVisualization</h2>
+
+<label>Prej dates</label><input type="date" id="from-date" />
+<label>Deri ne date</label><input type="date" id="to-date" />
+<label>Fjala</label><input type="text" id="word" />
+<button id="generate-chart">Paraqit grafikonin</button>
+
+<div id="chart" style="width: 900px; height: 500px">
+
+</div>
+
+<script type="text/javascript">
+  //  google.setOnLoadCallback(drawChart);
+
+    jQuery(document).ready(function () {
+        $("#generate-chart").on("click", function () {
+            drawChart();
+        });
+    });
+    function drawChart() {
+        var records  = [];
+        $.getJSON("/Home/GetTrends/?date_from=" + $("#from-date").val()
+                                    + "&date_to=" + $("#to-date").val()
+                                    + "&word=" + $("#word").val(),
+               function (data) {
+                   
+                   records = data;
+
+
+                   var content = google.visualization.arrayToDataTable(records);
+
+                   var options = {
+                       title: 'Trendet e paraqitjes se fjales ' + $("#word").val(),
+                       curveType: 'function',
+                       legend: { position: 'bottom' }
+                   };
+
+                   var chart = new google.visualization.LineChart(document.getElementById('chart'));
+
+                   chart.draw(content, options);
+
+               });
+
+       
+    }
+</script>
+ 

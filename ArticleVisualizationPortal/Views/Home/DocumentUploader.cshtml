@@ -1,0 +1,29 @@
+﻿@{
+    ViewBag.Title = "DocumentUploader";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<h2>Regjistrimi i artikujve</h2>
+@using (Html.BeginForm("AddArticle", "Home", FormMethod.Post))
+
+{
+   
+    <label>Emri i mediumit</label> 
+    <select id="media_name" name="media_name">
+        <option value="Shekulli">Shekulli</option>
+        <option value="Shqip">Gazeta Shqip</option>
+        <option value="Sot">Gazeta Sot</option>
+        <option value="Mapo">Mapo</option>
+    </select>
+  
+
+    <label>Adresa (web)</label> <input type="text" name="url" id="url" /><br />
+
+    <label>Emri i autorit</label><input type="text" name="author" id="author" /><br />
+
+    <label>Data e marjes</label> <input type="date" name="date_retrieved" id="date_retrieved" /><br />     
+    
+    <input type="submit" value="Shto dokumentin" />
+    <br /><br />
+    @ViewBag.Message
+}
+

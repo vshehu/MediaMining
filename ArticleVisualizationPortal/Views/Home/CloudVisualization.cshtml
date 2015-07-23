@@ -1,0 +1,111 @@
+﻿@{
+    ViewBag.Title = "CloudVisualization";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script src="/Scripts/d3.min.js"></script>
+<script src="/Scripts/d3.layout.cloud.js"></script>
+<script src="/Scripts/jquery-1.8.2.js"></script>
+
+
+<h2>Vizualizim i fjaleve me te perdorura</h2>
+<label>Emri i mediumit</label>
+<select id="media_name" name="media_name">
+    <option value="Shekulli">Shekulli</option>
+    <option value="Shqip">Gazeta Shqip</option>
+    <option value="Sot">Gazeta Sot</option>
+    <option value="Mapo">Mapo</option>
+</select>
+<label>Emri i autorit</label>
+<select id="author_name">
+
+</select>
+<label>Numri i fjaleve ne togfjalesh</label>
+<select id="words">
+    <option>1</option>
+    <option>2</option>
+    <option>3</option>
+</select>
+
+<label>Prej dates</label><input type="date" id="from-date" />
+<label>Deri ne date</label><input type="date" id="to-date" />
+<button id="generate-chart">Paraqit grafikonin</button>
+
+<div id="chart_placeholder">
+
+</div>
+<script type="text/javascript">
+
+    jQuery(document).ready(function () {
+        var layout = d3.layout.cloud();
+        var fill = d3.scale.category20();
+        
+        $("#media_name").trigger("change");
+        function draw(words) {  
+            d3.select("#chart_placeholder").append("svg")
+                .attr("width", layout.size()[0])
+                .attr("height", layout.size()[1])
+              .append("g")
+                .attr("transform", "translate(" + layout.size()[0] / 2 + "," + layout.size()[1] / 2 + ")")
+              .selectAll("text")
+                .data(words)
+              .enter().append("text")
+                .style("font-size", function (d) { return d.size + "px"; })
+                .style("font-family", "Impact")
+                .style("fill", function (d, i) { return fill(i); })
+                .attr("text-anchor", "middle")
+                .attr("transform", function (d) {
+                    return "translate(" + [d.x, d.y] + ")rotate(" + d.rotate + ")";
+                })
+                .text(function (d) { return d.text; });
+        }
+        var items = [];
+   
+        $("#media_name").on("change", function(){
+            $.getJSON("/Home/GetAuthors/?media_name=" + $("#media_name").val(),
+                function (data) {
+                    $("#author_name").html("");
+                    var opt = "";
+                    $("#author_name").append("<option value=0>Të gjithë</option>");
+                    $.each(data, function (index, value) {
+                        $("#author_name").append("<option value=" + value + ">" + value + "</option>");
+                        
+                    });
+                   
+                  
+                    });
+           });
+        $("#generate-chart").on("click", function () {
+
+
+           
+            $("#chart_placeholder").html("");
+
+
+            $.getJSON("/Home/GetCloudData/?media_name=" + $("#media_name").val() +
+                                            "&date_from=" + $("#from-date").val() +
+                                            "&date_to=" + $("#to-date").val() +
+                                            "&author_name=" +$("#author_name").val() +
+                                            "&word=" +  $("#words").val()
+                                            , function (data) {
+               
+
+                   
+                        layout.size([500, 500])
+                        .words(data.map(function(d) {
+                          return {text: d, size: 10 + Math.random() * 90, test: "haha"};
+                        }))
+                        .padding(5)
+                        .rotate(function() { return ~~(Math.random() * 2) * 90; })
+                        .font("Impact")
+                        .fontSize(function(d) { return d.size; })
+                        .on("end", draw);
+                    layout.start();
+                 
+            });
+
+
+        });
+    });
+
+    </script>
