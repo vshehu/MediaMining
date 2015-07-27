@@ -2,6 +2,7 @@
 using HtmlAgilityPack;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -71,7 +72,7 @@ namespace ArticleVisualizationPortal.Controllers
                         select new {a.DateRetrieved, w.Text, wf.Frequency };
 
             var res = from wf in words
-                      group wf by wf.Text into g
+                      group wf by new { wf.DateRetrieved, wf.Text }  into g
                       select new
                       {
                           Date = g.FirstOrDefault().DateRetrieved,
@@ -81,10 +82,12 @@ namespace ArticleVisualizationPortal.Controllers
             var ret = new object[res.Count() + 1];
 
             ret[0] = new[] { "Data", word };
-            for (int i = 0; i < res.Count(); i++ )
+
+            int cnt = 1;
                 foreach (var record in res)
                 {
-                    ret[i + 1] = new object[] { record.Date.ToShortDateString(), record.Frequency };
+                    ret[cnt] = new object[] { record.Date.ToShortDateString(), record.Frequency };
+                    cnt++;
                 }
             return new JsonResult()
             {
@@ -214,30 +217,15 @@ namespace ArticleVisualizationPortal.Controllers
         }
 
         [HttpPost] 
-        public ActionResult AddArticle(string media_name, string url, string author, string date_retrieved)
+        public ActionResult AddArticle( string url)
         {
             if (String.IsNullOrEmpty(url))
             {
-                ViewBag.Message = "Ju lutem shtoeni adresen a artikullit!";                 
+                ViewBag.Message = "Ju lutem shtoeni adresen a artikullit!";
+                return View();
             }
-            else if (String.IsNullOrEmpty(media_name))
-            {
-                ViewBag.Message = "Ju lutem shkruajeni emrin e mediumit!";
-            }
-            else
-            {
-                ViewBag.Message = "Artikulli i regjistrua me sukses!";
-            }
-            ArticleDBContext context = new ArticleDBContext();
-            Article a = new Article();
-            a.Author = author;
-            a.DateRetrieved = Convert.ToDateTime(date_retrieved);
-            a.MediaName = media_name;
-            a.Url = url;
-            context.Articles.Add(a);
-
-            context.SaveChanges();
-
+          
+           
             //e lexojme permbajtjen e faqes se dhene 
             WebRequest request = WebRequest.Create(url);
             request.Method = "GET";
@@ -251,26 +239,81 @@ namespace ArticleVisualizationPortal.Controllers
             HtmlDocument doc = new HtmlDocument();
             doc.LoadHtml(permbajtja);
               string paHtml = "";
-            
-            //Te shekulli permbajtja eshte brenda klases tekst
-            switch (media_name)
-	        {
-                case "Shekulli":
-                    paHtml = doc.DocumentNode.SelectNodes("//div[@class='tekst']").First().InnerText;
-                    break;
-                case "Shqip":
-                    paHtml = doc.DocumentNode.SelectNodes("//div[@class='td-ss-main-content']").First().InnerText;
-                    break;
-                case "Mapo":
-                    paHtml = doc.GetElementbyId("content").InnerText;
-                    break;
-                case "Sot":
-                    paHtml = doc.GetElementbyId("block-system-main").InnerText;
-                    break;
-		        default:
-                break;
-	        }
 
+              ArticleDBContext context = new ArticleDBContext();
+
+
+              Article a = new Article();
+              
+            //Te shekulli permbajtja eshte brenda klases tekst
+         
+                if (url.ToLower().Contains("shekulli"))
+                {
+                    paHtml = doc.DocumentNode.SelectNodes("//div[@class='tekst']").First().InnerText;
+                     
+                    a.Author  = doc.DocumentNode.SelectNodes("//ul[@class='li-info1lajmi']").Descendants()
+                                .Where(x => x.Name == "li" && x.ChildNodes.FirstOrDefault().Name == "a").FirstOrDefault().InnerText;
+
+                    string data = doc.DocumentNode.SelectNodes("//ul[@class='li-info1lajmi']").Descendants()
+                                .Where(x => x.Name == "li").ToList()[1].InnerText;
+
+
+                    int dita, muaji, viti;
+                    dita = Convert.ToInt32(data.Split(',')[0].Split(' ')[0]);
+                    Helper.Helper h = new Helper.Helper();
+
+                    muaji = h.Muajt[data.Split(',')[0].Split(' ')[1]];
+                    viti = Convert.ToInt32(data.Split(',')[0].Split(' ')[2]);
+                    a.DateRetrieved = new DateTime(viti, muaji, dita);
+                    a.MediaName = "Shekulli";
+                }
+                else if (url.ToLower().Contains("gazeta-shqip")) 
+                {
+                    paHtml = doc.DocumentNode.SelectNodes("//div[@class='td-ss-main-content']").First().InnerText;
+                    a.Author = doc.DocumentNode.SelectNodes("//div[@class='td-post-author-name']")[0].InnerText.Replace("Nga", "").Replace("-", "");
+                    a.MediaName = "Gazeta Shqip";
+
+                    string data = doc.DocumentNode.SelectNodes("//div[@class='td-post-date']")[0].InnerText;
+
+                    int dita, muaji, viti;
+                    dita = Convert.ToInt32(data.Split(' ')[0]);
+                    Helper.Helper h = new Helper.Helper();
+
+                    muaji = h.Muajt[data.Split(' ')[1]];
+                    viti = Convert.ToInt32(data.Split(' ')[2]);
+                    a.DateRetrieved = new DateTime(viti, muaji, dita);
+
+                }
+                else if (url.ToLower().Contains("mapo")) 
+                {
+                  paHtml = doc.GetElementbyId("content").InnerText;
+                  a.Author = "Mapo";
+                  a.MediaName = "Mapo";
+                }
+                else //if (url.ToLower().Contains("sot.com.al")) //kjo pjese te c'komentohet nese shtohen mediume tjera
+                {
+                  paHtml = doc.GetElementbyId("block-system-main").InnerText;
+                  a.MediaName = "Gazeta Sot";
+                  //Sunday, July 26, 2015
+                  string data = doc.DocumentNode.SelectNodes("//span[@class='date-display-single']")[0].InnerText.Split('-')[0];
+
+                  a.Author = "Gazeta Sot";
+
+                  int dita, muaji, viti;
+                  dita = Convert.ToInt32(data.Split(',')[1].Split(' ')[2]);
+                  Helper.Helper h = new Helper.Helper();
+
+                  muaji = h.Muajt[data.Split(',')[1].Split(' ')[1]];
+                  viti = Convert.ToInt32(data.Split(',')[2]);
+                  a.DateRetrieved = new DateTime(viti, muaji, dita);
+
+
+                }
+              
+            a.Url = url;
+            context.Articles.Add(a);
+
+            context.SaveChanges();
 
             //Pastrojme hapesirat e shprazeta
             var regex = new Regex(
@@ -279,25 +322,24 @@ namespace ArticleVisualizationPortal.Controllers
             );
 
             paHtml = regex.Replace(paHtml, "");
-
-
             paHtml = paHtml.Replace('\n', ' ');
             paHtml = paHtml.Replace('\t', ' ');
 
             
-          
-             
 
             //nxjerim fjalite. Supozojme se fjalite ndahen me !, ., ;, ?
             char[] delim_fjalite = {'.', '!', '?', ';' };
             string[] fjalite = paHtml.Split(delim_fjalite);
-            char[] delim_fjalet = { '“', '”', ' ', '.', '!', '?', ';', '"', '}', '{', '(', ')', '-', '=', '+', '*', '"', ';', ':', '!', '?','<', '>' };
+            char[] delim_fjalet = { '“', '”', ' ', '.', '!', '?', ';', '"', '}', '{', '(', ')', '-', '=', '+', '*', '"', ';', ':', '!', '?','<', '>', ',' };
 
             foreach (string fjali in fjalite)
             {
                 Phrase f = new Phrase();
+                string[] words = fjali.Split(delim_fjalet);
+                f.Text = String.Join(" ", words.Where(x => x.Length > 3));
+
                 f.ArticleId = a.ArticleId;
-                f.Text = fjali.ToLower();
+             
 
                 foreach (char c in delim_fjalet)
                 {
@@ -326,6 +368,7 @@ namespace ArticleVisualizationPortal.Controllers
                     wf.WordId = w.WordId;
                     wf.Frequency = 1;
                     context.WordFrequenies.Add(wf);
+                    context.SaveChanges();
                 }
                 else
                 {
@@ -339,17 +382,19 @@ namespace ArticleVisualizationPortal.Controllers
                     }
                     else
                     {
-                        wf = new WordFrequency();
-                        wf.ArticleId = a.ArticleId;
-                        wf.WordId = w.WordId;
-                        wf.Frequency = 1;
+                       WordFrequency wfNew = new WordFrequency();
+                       wfNew.ArticleId = a.ArticleId;
+                       wfNew.WordId = w.WordId;
+                       wfNew.Frequency = 1;
+                       context.WordFrequenies.Add(wfNew);
+                       context.SaveChanges();
                     }
                 }
             }
 
             //regjistrojme ne db
            
-            context.SaveChanges();
+       
 
             return View("DocumentUploader");
 
